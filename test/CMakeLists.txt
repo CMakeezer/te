@@ -6,4 +6,4 @@
 #
 include_directories(${CMAKE_CURRENT_LIST_DIR})
 
-test(te)
+test(te_)

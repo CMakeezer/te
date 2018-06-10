@@ -10,13 +10,14 @@ project(Type.Erasure CXX)
 option(ENABLE_MEMCHECK "Run the unit tests and examples under valgrind if it is found." OFF)
 option(ENABLE_COVERAGE "Run coverage." OFF)
 option(ENABLE_SANITIZERS "Run static analysis." OFF)
+option(ENABLE_TESTS "Enable tests" OFF)
 
 add_custom_target(style)
 add_custom_command(TARGET style COMMAND find ${CMAKE_CURRENT_LIST_DIR}/example
   ${CMAKE_CURRENT_LIST_DIR}/include ${CMAKE_CURRENT_LIST_DIR}/test -iname
   "*.hpp" -or -iname "*.cpp" | xargs clang-format -i)
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++1z")
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wextra")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror")
@@ -37,7 +38,12 @@ endif()
 
 enable_testing()
 
-include_directories(include)
+add_library(te INTERFACE)
+add_library(te::te ALIAS te)
+
+target_include_directories(te
+  INTERFACE
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/include>)
 
 find_program(MEMORYCHECK_COMMAND valgrind)
 if (ENABLE_MEMCHECK AND MEMORYCHECK_COMMAND)
@@ -45,14 +51,34 @@ if (ENABLE_MEMCHECK AND MEMORYCHECK_COMMAND)
     string(REPLACE "/" "_" out ${name})
     add_executable(${out} ${CMAKE_CURRENT_LIST_DIR}/${name}.cpp)
     add_custom_command(TARGET ${out} COMMAND ${MEMORYCHECK_COMMAND} --leak-check=full --error-exitcode=1 ./${out})
+    target_include_directories(${out} PRIVATE ${CMAKE_SOURCE_DIR}/include)
   endfunction()
 else()
   function(test name)
     string(REPLACE "/" "_" out ${name})
     add_executable(${out} ${CMAKE_CURRENT_LIST_DIR}/${name}.cpp)
     add_custom_command(TARGET ${out} COMMAND ./${out})
+    target_include_directories(${out} PRIVATE ${CMAKE_SOURCE_DIR}/include)
   endfunction()
 endif()
 
 add_subdirectory(example)
-add_subdirectory(test)
+
+if(ENABLE_TESTS)
+  add_subdirectory(test)
+endif()
+
+
+# Create an install target
+install(TARGETS te
+        EXPORT te-config
+        INCLUDES DESTINATION include)
+
+install(EXPORT te-config
+        FILE te-config.cmake
+        NAMESPACE te::
+        DESTINATION share/te/cmake)
+
+install(DIRECTORY include
+        DESTINATION te FILES_MATCHING PATTERN "*.hpp")
+
